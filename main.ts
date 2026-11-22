@@ -2,7 +2,7 @@
 //
 // The entry image is entry.png beside this file: a one-page summary of the
 // world's news of Sunday 22 November 2026 (two hero stories, eight grid
-// stories, twelve briefs, a markets ticker), drawn by build_22nov.py and
+// stories, twelve briefs, a markets ticker), drawn for this entry and
 // approved by the entrant. This program copies it to /output/entry.png and
 // verifies the copy byte for byte against the image's sha256, so a bad copy
 // can never reach the judge. It runs twice and writes the same bytes both
@@ -31,6 +31,24 @@ function main(): void {
   const target = join(outDir, 'entry.png');
 
   const bytes = readFileSync(source);
+
+  // The file must really be a PNG of the brief's 1024x1024: check the
+  // 8-byte PNG signature, then the IHDR width/height (big-endian uint32
+  // at bytes 16-20 and 20-24), before trusting the hash.
+  const PNG_SIGNATURE = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ]);
+  if (
+    bytes.length < 24 ||
+    !bytes.subarray(0, 8).equals(PNG_SIGNATURE) ||
+    bytes.readUInt32BE(16) !== 1024 ||
+    bytes.readUInt32BE(20) !== 1024
+  ) {
+    throw new Error(
+      'entry.png is not a 1024x1024 PNG (bad signature or dimensions)',
+    );
+  }
+
   const digest = sha256Hex(bytes);
   if (digest !== EXPECTED_SHA256) {
     throw new Error(
